@@ -5,6 +5,23 @@ import type {
 
 const INTEL_URL = "/intel/threat-intel.json";
 
+const VALID_CLASSIFICATIONS = new Set([
+  "malware",
+  "phishing",
+  "tracker",
+  "suspicious",
+  "unknown",
+]);
+
+const VALID_INDICATOR_TYPES = new Set(["domain", "url"]);
+
+const VALID_SOURCE_TYPES = new Set([
+  "synthetic",
+  "public_feed",
+  "commercial_provider",
+  "community",
+]);
+
 export class ThreatIntelError extends Error {
   constructor(message: string) {
     super(message);
@@ -22,51 +39,59 @@ function isRecord(
   );
 }
 
+function isValidDate(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
 function isIndicator(value: unknown): value is ThreatIndicator {
-  if (!isRecord(value)) {
+  if (!isRecord(value)) return false;
+
+  if (
+    typeof value.id !== "string" ||
+    !value.id.trim() ||
+    typeof value.value !== "string" ||
+    !value.value.trim() ||
+    typeof value.sourceId !== "string" ||
+    !value.sourceId.trim() ||
+    typeof value.description !== "string" ||
+    !VALID_INDICATOR_TYPES.has(String(value.indicatorType)) ||
+    !VALID_CLASSIFICATIONS.has(String(value.classification)) ||
+    !VALID_SOURCE_TYPES.has(String(value.sourceType))
+  ) {
     return false;
   }
 
-  const validClassifications = [
-    "malware",
-    "phishing",
-    "tracker",
-    "suspicious",
-    "unknown",
-  ];
+  if (
+    value.confidence !== undefined &&
+    (
+      typeof value.confidence !== "number" ||
+      !Number.isFinite(value.confidence) ||
+      value.confidence < 0 ||
+      value.confidence > 100
+    )
+  ) {
+    return false;
+  }
 
-  const validTypes = ["domain", "url"];
+  if (
+    value.firstSeenAt !== undefined &&
+    !isValidDate(value.firstSeenAt)
+  ) {
+    return false;
+  }
 
-  const validSourceTypes = [
-    "synthetic",
-    "public_feed",
-    "commercial_provider",
-    "community",
-  ];
+  if (
+    value.expiresAt !== undefined &&
+    !isValidDate(value.expiresAt)
+  ) {
+    return false;
+  }
 
-  return (
-    typeof value.id === "string" &&
-    value.id.length > 0 &&
-    typeof value.value === "string" &&
-    value.value.length > 0 &&
-    validTypes.includes(String(value.indicatorType)) &&
-    validClassifications.includes(String(value.classification)) &&
-    typeof value.sourceId === "string" &&
-    value.sourceId.length > 0 &&
-    validSourceTypes.includes(String(value.sourceType)) &&
-    typeof value.description === "string" &&
-    (value.confidence === undefined ||
-      (typeof value.confidence === "number" &&
-        Number.isFinite(value.confidence) &&
-        value.confidence >= 0 &&
-        value.confidence <= 100)) &&
-    (value.firstSeenAt === undefined ||
-      (typeof value.firstSeenAt === "string" &&
-        Number.isFinite(Date.parse(value.firstSeenAt)))) &&
-    (value.expiresAt === undefined ||
-      (typeof value.expiresAt === "string" &&
-        Number.isFinite(Date.parse(value.expiresAt))))
-  );
+  return true;
 }
 
 function validateDataset(
@@ -74,54 +99,69 @@ function validateDataset(
 ): ThreatIntelDataset {
   if (!isRecord(value)) {
     throw new ThreatIntelError(
-      "The threat-intelligence dataset is not a JSON object.",
+      "The threat-intelligence response must be a JSON object.",
+    );
+  }
+
+  if (value.schemaVersion !== 1) {
+    throw new ThreatIntelError(
+      `Unsupported schemaVersion: ${String(value.schemaVersion)}. Expected 1.`,
     );
   }
 
   if (
-    value.schemaVersion !== 1 ||
     typeof value.version !== "string" ||
-    !value.version ||
-    !["ready", "not_initialized"].includes(
-      String(value.status),
-    ) ||
-    !Array.isArray(value.sources) ||
-    !Array.isArray(value.indicators)
+    !value.version.trim()
   ) {
     throw new ThreatIntelError(
-      "The threat-intelligence dataset has an unsupported schema.",
+      "The dataset is missing a valid version string.",
     );
   }
 
   if (
-    value.generatedAt !== null &&
-    (typeof value.generatedAt !== "string" ||
-      !Number.isFinite(Date.parse(value.generatedAt)))
+    value.status !== "ready" &&
+    value.status !== "not_initialized"
   ) {
     throw new ThreatIntelError(
-      "The dataset generation timestamp is invalid.",
+      `Invalid dataset status: ${String(value.status)}.`,
+    );
+  }
+
+  if (!Array.isArray(value.sources)) {
+    throw new ThreatIntelError(
+      'The dataset field "sources" must be an array.',
+    );
+  }
+
+  if (!Array.isArray(value.indicators)) {
+    throw new ThreatIntelError(
+      'The dataset field "indicators" must be an array.',
+    );
+  }
+
+  if (!isValidDate(value.generatedAt)) {
+    throw new ThreatIntelError(
+      "The dataset must contain a valid generatedAt timestamp.",
     );
   }
 
   if (
     value.expiresAt !== null &&
-    (typeof value.expiresAt !== "string" ||
-      !Number.isFinite(Date.parse(value.expiresAt)))
+    !isValidDate(value.expiresAt)
   ) {
     throw new ThreatIntelError(
-      "The dataset expiration timestamp is invalid.",
+      "The dataset expiresAt must be a valid timestamp or null.",
     );
   }
 
   if (!value.indicators.every(isIndicator)) {
     throw new ThreatIntelError(
-      "The dataset contains an invalid threat indicator.",
+      "The dataset contains an invalid indicator. Check indicatorType, sourceType, classification, and required fields.",
     );
   }
 
-  const ids = value.indicators.map(
-    (indicator) => (indicator as ThreatIndicator).id,
-  );
+  const indicators = value.indicators as ThreatIndicator[];
+  const ids = indicators.map((indicator) => indicator.id);
 
   if (new Set(ids).size !== ids.length) {
     throw new ThreatIntelError(
@@ -129,15 +169,22 @@ function validateDataset(
     );
   }
 
-  if (
-    value.status === "ready" &&
-    (value.generatedAt === null ||
-      !value.sources.length ||
-      !value.indicators.length)
-  ) {
-    throw new ThreatIntelError(
-      "A ready dataset must contain generation metadata, sources, and indicators.",
-    );
+  if (value.status === "ready") {
+    if (value.sources.length === 0 || indicators.length === 0) {
+      throw new ThreatIntelError(
+        "A ready dataset must contain at least one source and one indicator.",
+      );
+    }
+
+    if (
+      value.expiresAt !== null &&
+      Date.parse(value.expiresAt as string) <=
+        Date.parse(value.generatedAt as string)
+    ) {
+      throw new ThreatIntelError(
+        "A ready dataset must expire after its generation time.",
+      );
+    }
   }
 
   return value as unknown as ThreatIntelDataset;
@@ -152,7 +199,7 @@ export async function loadThreatIntel(): Promise<ThreatIntelDataset> {
     });
   } catch {
     throw new ThreatIntelError(
-      "Threat intelligence could not be downloaded.",
+      "Threat intelligence could not be downloaded. Check your network connection.",
     );
   }
 
@@ -176,25 +223,25 @@ export async function loadThreatIntel(): Promise<ThreatIntelDataset> {
 
   if (dataset.status !== "ready") {
     throw new ThreatIntelError(
-      "Threat intelligence has not been initialized. A reputation verdict cannot be produced.",
+      "Threat intelligence has not been initialized. No reputation verdict is available.",
+    );
+  }
+
+  const now = Date.now();
+  const generatedAt = Date.parse(dataset.generatedAt);
+
+  if (generatedAt > now + 5 * 60 * 1000) {
+    throw new ThreatIntelError(
+      "The dataset generation timestamp is in the future.",
     );
   }
 
   if (
-    !dataset.generatedAt ||
-    Date.parse(dataset.generatedAt) > Date.now() + 5 * 60 * 1000
+    dataset.expiresAt !== null &&
+    Date.parse(dataset.expiresAt) <= now
   ) {
     throw new ThreatIntelError(
-      "The dataset generation timestamp is missing or invalid.",
-    );
-  }
-
-  if (
-    dataset.expiresAt &&
-    Date.parse(dataset.expiresAt) <= Date.now()
-  ) {
-    throw new ThreatIntelError(
-      "Threat intelligence has expired and must be refreshed.",
+      "Threat intelligence has expired. Refresh the dataset before checking URLs.",
     );
   }
 

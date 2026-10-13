@@ -1,10 +1,9 @@
 {
   "schemaVersion": 1,
-  "datasetVersion": "0.1.0",
+  "version": "2026.10.13-dev.2",
   "status": "not_initialized",
-  "generatedAt": null,
+  "generatedAt": "2026-10-13T00:00:00.000Z",
   "expiresAt": null,
-  "indicatorCount": 0,
   "sources": [],
   "indicators": []
 }
