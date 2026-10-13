@@ -1,0 +1,11 @@
+<!doctype html> <html lang="en"> <head> <meta charset="UTF-8" /> <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <title>Sentinel Web Protection</title> </head> <body> <main class="container"> <header class="header"> <div class="brand"> <div class="logo" aria-hidden="true">S</div> <div> <h1>Sentinel</h1> <p class="subtitle">Web Protection</p> </div> </div> <span class="version">v0.1.0</span> </header>
+
+<section class="status-card" aria-live="polite"> <span id="status-indicator" class="indicator"></span> <div class="status-content"> <h2 id="status-text">Loading protection status...</h2> <p id="status-description">Checking your settings</p> </div> </section>
+
+<section class="settings"> <div class="setting-row"> <div class="setting-info"> <label for="protection-toggle">Web protection</label> <p>Enable or disable protection features</p> </div> <input id="protection-toggle" type="checkbox" aria-describedby="status-description" disabled /> </div> </section>
+
+<p id="message" class="message" role="status" aria-live="polite"></p>
+
+<footer class="footer"> <span>Local-first security</span> <span>·</span> <span id="connection-status">No server configured</span> </footer> </main>
+
+<script type="module" src="./popup.ts"></script> </body> </html>
