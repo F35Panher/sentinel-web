@@ -1,17 +1,17 @@
-import { copyFileSync } from "node:fs"; import { resolve } from "node:path"; import { defineConfig } from "vite";
+import { copyFileSync } from "node:fs"; import { dirname, resolve } from "node:path"; import { fileURLToPath } from "node:url"; import { defineConfig } from "vite";
 
-export default defineConfig({ publicDir: "public",
+const projectRoot = dirname(fileURLToPath(import.meta.url));
 
-plugins: [ { name: "copy-extension-manifest", closeBundle() { copyFileSync( resolve(dirname, "manifest.json"), resolve(dirname, "dist/manifest.json") ); } } ],
+export default defineConfig({ root: projectRoot, publicDir: resolve(projectRoot, "public"),
 
-build: { outDir: "dist", emptyOutDir: true,
+plugins: [ { name: "copy-extension-manifest", closeBundle() { copyFileSync( resolve(projectRoot, "manifest.json"), resolve(projectRoot, "dist/manifest.json") ); } } ],
 
-rollupOptions: { input: { popup: resolve(dirname, "src/popup/popup.html"), background: resolve( dirname, "src/background/service-worker.ts" ) },
+build: { outDir: resolve(projectRoot, "dist"), emptyOutDir: true,
+
+rollupOptions: { input: { popup: resolve(projectRoot, "src/popup/popup.html"), background: resolve( projectRoot, "src/background/service-worker.ts" ) },
 
 output: { entryFileNames: (chunk) => { if (chunk.name === "background") { return "background/service-worker.js"; }
 
 return "assets/[name]-[hash].js"; },
 
-chunkFileNames: "assets/[name]-[hash].js",
-
-assetFileNames: "assets/[name]-[hash][extname]" } } } });
+chunkFileNames: "assets/[name]-[hash].js", assetFileNames: "assets/[name]-[hash][extname]" } } } });
