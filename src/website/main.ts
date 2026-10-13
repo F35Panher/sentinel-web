@@ -4,7 +4,7 @@ const form = document.querySelector<HTMLFormElement>("#url-form"); const input =
 
 if (!form || !input || !result) { throw new Error("Sentinel website elements are missing."); }
 
-function showResult(message: string, kind: "info" | "warning"): void { result.hidden = false; result.textContent = message; result.className = url-result ${kind}; }
+function showResult(message: string, kind: "info" | "warning"): void { result.hidden = false; result.textContent = message; result.className = url-result ${kind}'; }
 
 function normalizeUrl(value: string): URL | null { try { const url = new URL(value.trim());
 
