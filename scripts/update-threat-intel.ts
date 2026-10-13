@@ -1,8 +1,9 @@
-import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
+import { mkdir, writeFile, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { fetchUrlhausRecords } from "./feeds/urlhaus";
+import { fetchOpenPhishRecords } from "./feeds/openphish";
 
 const OUTPUT_PATH = "public/intel/threat-intel.json";
 const DATASET_TTL_MS = 48 * 60 * 60 * 1000;
@@ -23,21 +24,26 @@ async function main() {
     throw new Error("URLHAUS_AUTH_KEY is not configured.");
   }
 
-  const records = await fetchUrlhausRecords(apiKey);
+  // Fetch both sources. Fail the build if either source fails,
+  // so we don't silently publish an incomplete dataset.
+  const [urlhausRecords, openPhishRecords] = await Promise.all([
+    fetchUrlhausRecords(apiKey),
+    fetchOpenPhishRecords(),
+  ]);
 
-  if (records.length === 0) {
+  if (urlhausRecords.length === 0 && openPhishRecords.length === 0) {
     throw new Error(
-      "URLhaus returned no valid records. Refusing to publish an empty dataset."
+      "All threat-intelligence sources returned no records.",
     );
   }
 
   const now = new Date();
   const generatedAt = now.toISOString();
   const expiresAt = new Date(
-    now.getTime() + DATASET_TTL_MS
+    now.getTime() + DATASET_TTL_MS,
   ).toISOString();
 
-  const indicators = records.map((record) => {
+  const urlhausIndicators = urlhausRecords.map((record) => {
     const url = new URL(record.url);
 
     return {
@@ -53,12 +59,32 @@ async function main() {
     };
   });
 
+  const openPhishIndicators = openPhishRecords.map((record) => ({
+    id: `openphish-${randomUUID()}`,
+    value: record.url,
+    indicatorType: "url" as const,
+    classification: "phishing" as const,
+    sourceId: "openphish",
+    sourceType: "public_feed" as const,
+    firstSeenAt: generatedAt,
+    expiresAt,
+    description:
+      "URL reported by the OpenPhish community phishing feed.",
+  }));
+
+  // Include indicators from BOTH sources before deduplication.
+  // Prefer the URLhaus record when both sources report the same URL.
+  const indicators = [
+    ...urlhausIndicators,
+    ...openPhishIndicators,
+  ];
+
   const uniqueIndicators = [
     ...new Map(
       indicators.map((indicator) => [
         `${indicator.indicatorType}:${indicator.value}`,
         indicator,
-      ])
+      ]),
     ).values(),
   ];
 
@@ -77,6 +103,14 @@ async function main() {
         termsUrl: "https://urlhaus.abuse.ch/api/",
         lastSuccessfulFetchAt: generatedAt,
       },
+      {
+        id: "openphish",
+        name: "OpenPhish Community Feed",
+        type: "public_feed",
+        attributionUrl: "https://openphish.com/",
+        termsUrl: "https://openphish.com/phishing_feeds.html",
+        lastSuccessfulFetchAt: generatedAt,
+      },
     ],
     indicators: uniqueIndicators,
   };
@@ -86,7 +120,7 @@ async function main() {
 
   await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 
-  // Validate the JSON before publication.
+  // Validate JSON before publication.
   JSON.parse(output);
 
   await writeFile(temporaryPath, output, "utf8");
@@ -99,7 +133,8 @@ async function main() {
   }
 
   console.log("Threat intelligence generated successfully.");
-  console.log(`Valid URLhaus records: ${records.length}`);
+  console.log(`URLhaus records: ${urlhausRecords.length}`);
+  console.log(`OpenPhish records: ${openPhishRecords.length}`);
   console.log(`Unique indicators: ${uniqueIndicators.length}`);
   console.log(`Dataset version: ${dataset.version}`);
   console.log(`Generated at: ${generatedAt}`);
@@ -108,7 +143,7 @@ async function main() {
 main().catch((error: unknown) => {
   console.error(
     "Threat intelligence generation failed:",
-    error instanceof Error ? error.message : "Unknown error"
+    error instanceof Error ? error.message : "Unknown error",
   );
   process.exitCode = 1;
 });
