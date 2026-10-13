@@ -97,10 +97,14 @@ export async function fetchUrlhausRecords(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `URLhaus request failed with HTTP ${response.status}.`,
-    );
-  }
+  const details = await response.text();
+
+  throw new Error(
+    `URLhaus request failed with HTTP ${response.status}: ${
+      details.slice(0, 500)
+    }`,
+  );
+}
 
   const payload: unknown = await response.json();
 
