@@ -1,0 +1,64 @@
+name: Update Sentinel Threat Intelligence
+
+on:
+  schedule:
+    # Run daily at 03:17 UTC.
+    - cron: "17 3 * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sentinel-threat-intel-update
+  cancel-in-progress: false
+
+jobs:
+  update-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck project
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Generate threat intelligence
+        run: npm run intel:update
+        env:
+          URLHAUS_AUTH_KEY: ${{ secrets.URLHAUS_AUTH_KEY }}
+
+      - name: Verify production build
+        run: npm run build
+
+      - name: Commit updated intelligence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add public/intel/threat-intel.json
+
+          if git diff --cached --quiet; then
+            echo "Threat intelligence has not changed."
+            exit 0
+          fi
+
+          git commit -m "chore: update threat intelligence"
+          git push origin HEAD:main
