@@ -1,4 +1,4 @@
-mport "./popup.css";
+import "./popup.css";
 
 const toggle = document.querySelector<HTMLInputElement>( "#protection-toggle" ); const statusText = document.querySelector<HTMLHeadingElement>( "#status-text" ); const statusDescription = document.querySelector<HTMLParagraphElement>( "#status-description" ); const indicator = document.querySelector<HTMLSpanElement>( "#status-indicator" ); const message = document.querySelector<HTMLParagraphElement>( "#message" );
 
