@@ -1,4 +1,4 @@
-import type { ProtectionSettings } from "../shared/types";
+mport type { ProtectionSettings } from "../shared/types";
 
 const DEFAULT_SETTINGS: ProtectionSettings = { protectionEnabled: true };
 
@@ -8,7 +8,7 @@ if (typeof current.protectionEnabled !== "boolean") { await chrome.storage.local
 
 console.info("Sentinel Web Protection initialized."); }
 
-chrome.runtime.onInstalled.addListener((details) => { console.info( Sentinel Web Protection event: ${details.reason} );
+chrome.runtime.onInstalled.addListener((details) => { console.info( "Sentinel Web Protection event: " + details.reason );
 
 void initializeSettings().catch((error: unknown) => { console.error( "Failed to initialize Sentinel settings:", error ); }); });
 
