@@ -5,7 +5,8 @@ import { LOCAL_THREAT_INDICATORS } from "../src/detection/local-indicators";
 
 import type { ThreatIndicator } from "../src/shared/types";
 
-const NOW = Date.parse("2026-10-13T12:00:00.000Z");
+const now = (options.now ?? Date.now)();
+const checkedAt = new Date(now).toISOString();
 
 const check = (url: string, indicators?: readonly ThreatIndicator[]) =>
   checkUrlReputation(url, {
