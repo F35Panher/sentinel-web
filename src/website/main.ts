@@ -4,7 +4,7 @@ const form = document.querySelector<HTMLFormElement>("#url-form"); const input =
 
 if (!form || !input || !result) { throw new Error("Sentinel website elements are missing."); }
 
-function showResult(message: string, kind: "info" | "warning"): void { result.hidden = false; result.textContent = message; result.className = url-result ${kind}'; }
+function showResult( message: string, kind: "info" | "warning" ): void { result.hidden = false; result.textContent = message; result.className = "url-result " + kind; }
 
 function normalizeUrl(value: string): URL | null { try { const url = new URL(value.trim());
 
@@ -16,11 +16,11 @@ return url; } catch { return null; } }
 
 form.addEventListener("submit", (event: SubmitEvent) => { event.preventDefault();
 
-const submittedValue = input.value.trim(); const url = normalizeUrl(submittedValue);
+const url = normalizeUrl(input.value);
 
 if (!url) { showResult( "Enter a valid HTTP or HTTPS website URL.", "warning" ); return; }
 
-showResult( URL format accepted: ${url.hostname}. Reputation checking is not connected yet, so Sentinel cannot determine whether this link is malicious., "info" ); });
+showResult( "URL format accepted: " + url.hostname + ". Reputation checking is not connected yet, so Sentinel cannot determine whether this link is malicious.", "info" ); });
 
 const extensionLink = document.querySelector<HTMLAnchorElement>("#extension-link");
 
