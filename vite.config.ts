@@ -6,6 +6,15 @@ export default defineConfig({ root: projectRoot, publicDir: resolve(projectRoot,
 
 plugins: [ { name: "copy-extension-manifest", closeBundle() { copyFileSync( resolve(projectRoot, "manifest.json"), resolve(projectRoot, "dist/manifest.json") ); } } ],
 
+input: {
+  website: resolve(projectRoot, "index.html"),
+  popup: resolve(projectRoot, "src/popup/popup.html"),
+  background: resolve(
+    projectRoot,
+    "src/background/service-worker.ts"
+  )
+}
+
 build: { outDir: resolve(projectRoot, "dist"), emptyOutDir: true,
 
 rollupOptions: { input: { popup: resolve(projectRoot, "src/popup/popup.html"), background: resolve( projectRoot, "src/background/service-worker.ts" ) },
