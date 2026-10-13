@@ -1,27 +1,105 @@
 import "./style.css";
 
-const form = document.querySelector<HTMLFormElement>("#url-form"); const input = document.querySelector<HTMLInputElement>("#url-input"); const result = document.querySelector<HTMLDivElement>("#url-result");
+import { checkUrlReputation } from "../detection/reputation-engine";
 
-if (!form || !input || !result) { throw new Error("Sentinel website elements are missing."); }
+const form = document.querySelector<HTMLFormElement>(
+  "#url-check-form",
+);
+const input = document.querySelector<HTMLInputElement>(
+  "#url-input",
+);
+const resultContainer = document.querySelector<HTMLElement>(
+  "#url-check-result",
+);
 
-function showResult( message: string, kind: "info" | "warning" ): void { result.hidden = false; result.textContent = message; result.className = "url-result " + kind; }
+if (!form || !input || !resultContainer) {
+  throw new Error(
+    "Sentinel URL checker elements were not found. Check index.html selectors.",
+  );
+}
 
-function normalizeUrl(value: string): URL | null { try { const url = new URL(value.trim());
+form.addEventListener("submit", (event: SubmitEvent) => {
+  event.preventDefault();
 
-if (url.protocol !== "https:" && url.protocol !== "http:") { return null; }
+  const submittedUrl = input.value.trim();
 
-if (!url.hostname || !url.hostname.includes(".")) { return null; }
+  if (!submittedUrl) {
+    renderMessage("Enter a URL to check.");
+    return;
+  }
 
-return url; } catch { return null; } }
+  const result = checkUrlReputation(submittedUrl);
 
-form.addEventListener("submit", (event: SubmitEvent) => { event.preventDefault();
+  renderResult(result);
+});
 
-const url = normalizeUrl(input.value);
+function renderMessage(message: string): void {
+  resultContainer.replaceChildren();
+  resultContainer.hidden = false;
 
-if (!url) { showResult( "Enter a valid HTTP or HTTPS website URL.", "warning" ); return; }
+  const messageElement = document.createElement("p");
+  messageElement.textContent = message;
 
-showResult( "URL format accepted: " + url.hostname + ". Reputation checking is not connected yet, so Sentinel cannot determine whether this link is malicious.", "info" ); });
+  resultContainer.append(messageElement);
+}
 
-const extensionLink = document.querySelector<HTMLAnchorElement>("#extension-link");
+function renderResult(
+  result: ReturnType<typeof checkUrlReputation>,
+): 
+void {
+  resultContainer.replaceChildren();
+  resultContainer.hidden = false;
 
-if (extensionLink) { extensionLink.addEventListener("click", (event: MouseEvent) => { if (extensionLink.getAttribute("aria-disabled") === "true") { event.preventDefault(); } }); }
+  const heading = document.createElement("h3");
+  heading.textContent = getVerdictLabel(result.verdict);
+
+  const explanation = document.createElement("p");
+  explanation.textContent = result.explanation;
+
+  resultContainer.append(heading, explanation);
+
+  if (result.normalizedUrl) {
+    const normalizedUrl = document.createElement("p");
+    normalizedUrl.textContent = `Checked URL: ${result.normalizedUrl}`;
+    resultContainer.append(normalizedUrl);
+  }
+
+  if (result.evidence.length > 0) {
+    const evidenceHeading = document.createElement("h4");
+    evidenceHeading.textContent = "Detection evidence";
+
+    const evidenceList = document.createElement("ul");
+
+    for (const item of result.evidence) {
+      const listItem = document.createElement("li");
+      listItem.textContent =
+        `${item.classification}: ${item.description} ` +
+        `(Indicator: ${item.indicatorId}; Source: ${item.sourceId})`;
+
+      evidenceList.append(listItem);
+    }
+
+    resultContainer.append(evidenceHeading, evidenceList);
+  }
+}
+
+function getVerdictLabel(
+  verdict: ReturnType<typeof checkUrlReputation>["verdict"],
+): string {
+  switch (verdict) {
+    case "malicious":
+      return "Known malicious indicator matched";
+
+    case "suspicious":
+      return "Suspicious destination indicator matched";
+
+    case "tracker":
+      return "Known tracker indicator matched";
+
+    case "no_known_threat_found":
+      return "No known threat found";
+
+    case "unable_to_determine":
+      return "Unable to determine reputation";
+  }
+}
