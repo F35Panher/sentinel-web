@@ -1,4 +1,4 @@
-mport type { ProtectionSettings } from "../shared/types";
+import type { ProtectionSettings } from "../shared/types";
 
 const DEFAULT_SETTINGS: ProtectionSettings = { protectionEnabled: true };
 
