@@ -35,8 +35,7 @@ function isExpired(
 
   const expiry = Date.parse(indicator.expiresAt);
 
-  // Invalid expiration metadata must not silently make an
-  // indicator permanent or cause an unreliable detection.
+  // Invalid expiry metadata must not leave an indicator active forever.
   if (!Number.isFinite(expiry)) {
     return true;
   }
@@ -53,8 +52,8 @@ function indicatorMatches(
     const normalizedIndicator = normalizeUrl(indicator.value);
 
     return (
-      normalizedIndicator.valid &&
-      normalizedIndicator.normalizedUrl === normalizedUrl
+      normalizedIndicator.success &&
+      normalizedIndicator.value.url === normalizedUrl
     );
   }
 
@@ -115,42 +114,27 @@ export function checkUrlReputation(
 
   const normalized = normalizeUrl(input);
 
-  if (!normalized.valid || !normalized.normalizedUrl) {
+  if (!normalized.success) {
     return {
       verdict: "unable_to_determine",
       normalizedUrl: null,
       matched: false,
       evidence: [],
-      explanation:
-        "The URL is invalid or uses an unsupported protocol. Sentinel could not determine its reputation.",
+      explanation: normalized.message,
     };
   }
 
-  let parsedUrl: URL;
+  const normalizedUrl = normalized.value.url;
+  const hostname = normalized.value.hostname;
 
-  try {
-    parsedUrl = new URL(normalized.normalizedUrl);
-  } catch {
-    return {
-      verdict: "unable_to_determine",
-      normalizedUrl: null,
-      matched: false,
-      evidence: [],
-      explanation:
-        "Sentinel could not parse the normalized URL.",
-    };
-  }
-
-  // Fail closed on malformed expiration metadata for matching
-  // indicators rather than allowing stale data to produce a verdict.
   const matchedIndicators = indicators.filter((indicator) => {
     if (isExpired(indicator, now)) {
       return false;
     }
 
     return indicatorMatches(
-      normalized.normalizedUrl,
-      parsedUrl.hostname,
+      normalizedUrl,
+      hostname,
       indicator,
     );
   });
@@ -158,7 +142,7 @@ export function checkUrlReputation(
   if (matchedIndicators.length === 0) {
     return {
       verdict: "no_known_threat_found",
-      normalizedUrl: normalized.normalizedUrl,
+      normalizedUrl,
       matched: false,
       evidence: [],
       explanation:
@@ -180,7 +164,7 @@ export function checkUrlReputation(
 
   return {
     verdict,
-    normalizedUrl: normalized.normalizedUrl,
+    normalizedUrl,
     matched: true,
     evidence,
     explanation:
