@@ -6,7 +6,11 @@
 
 <section id="url-checker" class="checker"> <h2>Check a suspicious URL</h2> <form id="url-form"> <label for="url-input">Website URL</label> <div class="input-row"> <input id="url-input" name="url" type="url" placeholder="https://example.com" autocomplete="url" required /> <button type="submit">Check URL</button> </div> </form>
 
-<p class="privacy-note"> URL reputation checking is not connected yet. Do not treat this preview as a security verdict. </p>
+<p class="privacy-note">
+  Sentinel checks URLs against its available local threat indicators.
+  Results may be incomplete and do not guarantee that a website is safe.
+  Do not submit private or authenticated links.
+</p>
 
 <div id="url-result" role="status" aria-live="polite" hidden></div> </section> </section>
 
