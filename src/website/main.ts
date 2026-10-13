@@ -1,6 +1,6 @@
 import "./style.css";
-
 import { checkUrlReputation } from "../detection/reputation-engine";
+import { loadThreatIntel } from "../detection/intel-loader";
 
 const form = document.querySelector<HTMLFormElement>("#url-form");
 const input = document.querySelector<HTMLInputElement>("#url-input");
@@ -13,7 +13,7 @@ if (!form || !input || !resultContainer) {
   );
 }
 
-form.addEventListener("submit", (event: SubmitEvent) => {
+form.addEventListener("submit", async (event: SubmitEvent) => {
   event.preventDefault();
 
   const submittedUrl = input.value.trim();
@@ -23,11 +23,24 @@ form.addEventListener("submit", (event: SubmitEvent) => {
     return;
   }
 
-  // Run the shared local reputation engine.
-  // No request is made to the submitted website.
-  const result = checkUrlReputation(submittedUrl);
+  renderMessage("Loading threat intelligence and checking URL...");
 
-  renderResult(result);
+  try {
+    const dataset = await loadThreatIntel();
+
+    const result = checkUrlReputation(submittedUrl, {
+      indicators: dataset.indicators,
+      datasetVersion: dataset.version,
+    });
+
+    renderResult(result);
+  } catch (error) {
+    renderMessage(
+      error instanceof Error
+        ? error.message
+        : "Sentinel could not load threat intelligence. No verdict is available.",
+    );
+  }
 });
 
 function renderMessage(message: string): void {
