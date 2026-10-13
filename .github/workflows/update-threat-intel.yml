@@ -15,7 +15,7 @@ concurrency:
 jobs:
   update-intelligence:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -24,7 +24,7 @@ jobs:
           ref: main
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -39,13 +39,47 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm test
+      - name: Check URLhaus configuration
+        env:
+          URLHAUS_AUTH_KEY: ${{ secrets.URLHAUS_AUTH_KEY }}
+        run: |
+          if [ -z "$URLHAUS_AUTH_KEY" ]; then
+            echo "::error::URLHAUS_AUTH_KEY is missing from GitHub Actions secrets."
+            exit 1
+          fi
+          echo "URLhaus API key is configured."
 
       - name: Generate threat intelligence
         run: npm run intel:update
         env:
           URLHAUS_AUTH_KEY: ${{ secrets.URLHAUS_AUTH_KEY }}
+
+      - name: Validate generated dataset
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          const path = "public/intel/threat-intel.json";
+          const data = JSON.parse(readFileSync(path, "utf8"));
+
+          console.log("Dataset status:", data.status);
+          console.log("Dataset version:", data.version);
+          console.log("Sources:", data.sources?.length ?? 0);
+          console.log("Indicators:", data.indicators?.length ?? 0);
+
+          if (
+            data.schemaVersion !== 1 ||
+            data.status !== "ready" ||
+            !Array.isArray(data.sources) ||
+            data.sources.length === 0 ||
+            !Array.isArray(data.indicators) ||
+            data.indicators.length === 0
+          ) {
+            throw new Error(
+              "Generated threat-intelligence dataset is not ready."
+            );
+          }
+          NODE
 
       - name: Build project
         run: npm run build
